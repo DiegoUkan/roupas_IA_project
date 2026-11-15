@@ -1,0 +1,6 @@
+# Mantém finais de linha LF no repositório (o servidor Docker é Linux).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary

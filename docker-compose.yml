@@ -1,0 +1,20 @@
+services:
+  estudio-ia:
+    build: .
+    image: estudio-ia:latest
+    container_name: estudio-ia
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Senha para abrir o sistema (recomendado se o servidor for acessível pela internet).
+      # Deixe vazio para não pedir senha (uso só na rede de casa).
+      - APP_PASSWORD=${APP_PASSWORD:-}
+      # Opcional: a chave também pode ser colocada pela tela de Configurações.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      # Banco, fotos enviadas, modelos e imagens geradas ficam aqui (não se perdem ao atualizar).
+      - estudio-dados:/app/data
+
+volumes:
+  estudio-dados:
