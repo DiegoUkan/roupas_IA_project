@@ -2,10 +2,12 @@ import { randomBytes } from "node:crypto";
 import { db, nowIso } from "./db";
 import { fundoById, poseById, proporcaoById } from "./catalog";
 import { getBrandModel } from "./brandModels";
+import { calcularCusto } from "./custos";
 import { finalizarSaida } from "./images";
 import { readDataFile, toRel, writeDataFile } from "./paths";
 import { montarPromptEdicao } from "./prompt";
 import { getProvider, ProviderError, tamanhoParaApi } from "./providers";
+import { exportarParaEditadas } from "./saida";
 import { getSettings } from "./settings";
 
 const MAX_TENTATIVAS = 3;
@@ -24,6 +26,9 @@ export type JobRow = {
   error: string | null;
   output_file: string | null;
   usage: string | null;
+  exported_file: string | null;
+  review: string | null;
+  cost_usd: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -37,7 +42,17 @@ type BatchRow = {
   options: string;
 };
 
-type ItemRow = { id: string; code: string; source_images: string };
+type ItemRow = { id: string; code: string; source_images: string; product: string | null; options: string | null };
+
+type OpcoesItem = { folderPath?: string; extraPrompt?: string; backgroundId?: string; brandModelId?: string | null };
+
+function opcoesDoItem(item: ItemRow): OpcoesItem {
+  try {
+    return JSON.parse(item.options || "{}") as OpcoesItem;
+  } catch {
+    return {};
+  }
+}
 
 type EstadoFila = { iniciada: boolean; rodando: number };
 
@@ -105,8 +120,9 @@ async function executar(job: JobRow) {
     const item = conn.prepare("SELECT * FROM items WHERE id = ?").get(job.item_id) as ItemRow | undefined;
     if (!batch || !item) return; // lote apagado enquanto esperava
 
+    const opItem = opcoesDoItem(item);
     const pose = poseById(job.pose_id);
-    const fundo = fundoById(batch.background_id);
+    const fundo = fundoById(opItem.backgroundId ?? batch.background_id);
     if (!pose || !fundo) throw new ProviderError("Pose ou fundo não existe mais no catálogo.");
 
     const opcoes = JSON.parse(batch.options || "{}") as { aspect?: string; quality?: string };
@@ -119,7 +135,8 @@ async function executar(job: JobRow) {
       filename: `peca_${i + 1}.jpg`,
     }));
 
-    const modelo = batch.brand_model_id ? getBrandModel(batch.brand_model_id) : null;
+    const modeloId = opItem.brandModelId !== undefined ? opItem.brandModelId : batch.brand_model_id;
+    const modelo = modeloId ? getBrandModel(modeloId) : null;
     const referencias = (modelo?.images ?? []).map((rel, i) => ({ data: readDataFile(rel), filename: `modelo_${i + 1}.jpg` }));
 
     const prompt = montarPromptEdicao({
@@ -130,6 +147,9 @@ async function executar(job: JobRow) {
         ? { descricao: modelo.description, trocarCabelo: modelo.swapHair, qtdReferencias: referencias.length }
         : null,
       descricao: batch.description,
+      produto: item.product ?? "",
+      diretrizes: settings.systemPrompt,
+      instrucoesProduto: opItem.extraPrompt ?? "",
     });
 
     const size =
@@ -155,13 +175,30 @@ async function executar(job: JobRow) {
       batch.id,
       `${nomeArquivo(item.code)}_${pose.id}_${job.variation}-${randomBytes(3).toString("hex")}.jpg`,
     );
-    writeDataFile(rel, final);
+    writeDataFile(rel, final.data);
 
+    // Produto vindo das pastas: copia para Editadas/<mesmo caminho>/<Pose>.jpg
+    let exportado: string | null = null;
+    if (opItem.folderPath) {
+      try {
+        exportado = exportarParaEditadas(opItem.folderPath, pose.id, final.data);
+      } catch (e) {
+        console.error("[fila] não consegui gravar em Editadas", e);
+      }
+    }
+
+    // Guarda o tamanho pedido e o recebido da API (ajuda a investigar enquadramento e custo).
+    const usage = { pedido: size, recebido: final.original, api: resultado.usage ?? null };
+    const custo =
+      settings.provider === "simulacao"
+        ? null
+        : calcularCusto(resultado.usage as { input_tokens?: number; output_tokens?: number } | undefined, settings);
     conn
       .prepare(
-        "UPDATE jobs SET status = 'pronto', output_file = ?, usage = ?, error = NULL, next_attempt_at = NULL, updated_at = ? WHERE id = ?",
+        `UPDATE jobs SET status = 'pronto', output_file = ?, usage = ?, exported_file = ?, cost_usd = ?, error = NULL,
+         next_attempt_at = NULL, updated_at = ? WHERE id = ?`,
       )
-      .run(rel, resultado.usage ? JSON.stringify(resultado.usage) : null, nowIso(), job.id);
+      .run(rel, JSON.stringify(usage), exportado, custo, nowIso(), job.id);
   } catch (err) {
     const pe = err instanceof ProviderError ? err : null;
     const mensagem = pe ? pe.message : `Erro inesperado: ${err instanceof Error ? err.message : String(err)}`;

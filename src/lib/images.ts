@@ -18,9 +18,29 @@ export async function normalizarUpload(buf: Buffer): Promise<{ data: Buffer; wid
   }
 }
 
-/** Ajusta a imagem gerada ao tamanho final exato (recorte central) e salva em JPEG. */
-export async function finalizarSaida(buf: Buffer, largura: number, altura: number): Promise<Buffer> {
-  return sharp(buf).resize(largura, altura, { fit: "cover", position: "centre" }).jpeg({ quality: 92 }).toBuffer();
+/**
+ * Ajusta a imagem gerada ao tamanho final SEM cortar nada (cabeça e pés ficam inteiros).
+ * Se a proporção vier diferente da pedida, a imagem inteira é centralizada e o espaço
+ * que sobra é preenchido com uma versão desfocada do próprio fundo.
+ */
+export async function finalizarSaida(
+  buf: Buffer,
+  largura: number,
+  altura: number,
+): Promise<{ data: Buffer; original: string }> {
+  const meta = await sharp(buf).metadata();
+  const w0 = meta.width ?? largura;
+  const h0 = meta.height ?? altura;
+  const original = `${w0}x${h0}`;
+
+  if (Math.abs(w0 / h0 - largura / altura) < 0.01) {
+    return { data: await sharp(buf).resize(largura, altura, { fit: "fill" }).jpeg({ quality: 92 }).toBuffer(), original };
+  }
+
+  const fundo = await sharp(buf).resize(largura, altura, { fit: "cover" }).blur(40).modulate({ brightness: 1.02 }).toBuffer();
+  const frente = await sharp(buf).resize(largura, altura, { fit: "inside" }).toBuffer();
+  const data = await sharp(fundo).composite([{ input: frente, gravity: "centre" }]).jpeg({ quality: 92 }).toBuffer();
+  return { data, original };
 }
 
 /** Imagem de simulação: a foto original com uma faixa de texto (para testar sem gastar). */

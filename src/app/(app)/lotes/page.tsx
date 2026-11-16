@@ -3,19 +3,24 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { listarLotes } from "@/lib/batches";
-import { api, dataHora, mensagemErro } from "@/lib/client";
+import { api, dataHora, formatarCusto, mensagemErro, type ResumoCustos } from "@/lib/client";
 
 type Resumo = ReturnType<typeof listarLotes>[number];
 
 export default function LotesPage() {
   const [lotes, setLotes] = useState<Resumo[] | null>(null);
   const [erro, setErro] = useState("");
+  const [custos, setCustos] = useState<ResumoCustos | null>(null);
 
   useEffect(() => {
-    const carregar = () =>
+    const carregar = () => {
       api<Resumo[]>("/api/batches")
         .then(setLotes)
         .catch((e) => setErro(mensagemErro(e)));
+      api<ResumoCustos>("/api/custos")
+        .then(setCustos)
+        .catch(() => {});
+    };
     carregar();
     const t = setInterval(carregar, 5000);
     return () => clearInterval(t);
@@ -27,6 +32,11 @@ export default function LotesPage() {
         <div>
           <h1 className="titulo">Lotes</h1>
           <p className="ajuda mt-1">Todas as gerações feitas, das mais novas para as mais antigas.</p>
+          {custos && custos.mesUSD > 0 && (
+            <p className="ajuda mt-1">
+              Gasto neste mês: <strong className="text-stone-700">{formatarCusto(custos.mesUSD, custos.cotacao)}</strong>
+            </p>
+          )}
         </div>
         <Link href="/" className="btn-primario">
           Nova geração

@@ -83,6 +83,31 @@ function migrate(conn: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_jobs_batch  ON jobs(batch_id);
     CREATE INDEX IF NOT EXISTS idx_items_batch ON items(batch_id);
   `);
+
+  conn.exec(`
+    CREATE TABLE IF NOT EXISTS pastas (
+      caminho     TEXT PRIMARY KEY,
+      nome        TEXT NOT NULL,
+      fotos       TEXT NOT NULL DEFAULT '[]',
+      processadas TEXT NOT NULL DEFAULT '[]',
+      ignorada    TEXT,
+      prompt_txt  TEXT,
+      visto_em    TEXT NOT NULL,
+      ultimo_lote TEXT
+    );
+  `);
+
+  // Migrações de colunas novas (bancos criados antes delas).
+  const colunas = (tabela: string) =>
+    (conn.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map((c) => c.name);
+  const colunasItems = colunas("items");
+  if (!colunasItems.includes("product")) conn.exec("ALTER TABLE items ADD COLUMN product TEXT NOT NULL DEFAULT ''");
+  // options: { folderPath?, extraPrompt?, backgroundId?, brandModelId? (null = manter pessoa) }
+  if (!colunasItems.includes("options")) conn.exec("ALTER TABLE items ADD COLUMN options TEXT NOT NULL DEFAULT '{}'");
+  const colunasJobs = colunas("jobs");
+  if (!colunasJobs.includes("exported_file")) conn.exec("ALTER TABLE jobs ADD COLUMN exported_file TEXT");
+  if (!colunasJobs.includes("review")) conn.exec("ALTER TABLE jobs ADD COLUMN review TEXT");
+  if (!colunasJobs.includes("cost_usd")) conn.exec("ALTER TABLE jobs ADD COLUMN cost_usd REAL");
 }
 
 export function newId(): string {

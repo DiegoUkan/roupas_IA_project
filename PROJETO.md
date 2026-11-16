@@ -24,8 +24,8 @@ Um sistema para transformar, de forma rápida, as fotos de roupas tiradas durant
 |---|---|
 | Planejamento e alinhamento | Concluído (11/11/2026) |
 | Padrões assumidos (seção 4) | Aceitos com o "pode começar" (15/11/2026) |
-| Desenvolvimento | Fases 1 e 2 prontas, Fase 3 quase toda (15/11/2026) — falta testar com a API real e no Docker |
-| Como rodar | Ver [README.md](README.md) |
+| Desenvolvimento | Fases 1–3 prontas + **Fase 6 (pastas e CasaOS)** (16/11/2026) — falta rodar no CasaOS de verdade |
+| Como rodar / instalar no CasaOS | Ver [README.md](README.md) |
 
 ---
 
@@ -36,7 +36,9 @@ Um sistema para transformar, de forma rápida, as fotos de roupas tiradas durant
 | Tipo de foto de entrada | Foto de **uma pessoa já vestindo a roupa**. A IA **melhora a imagem** e **troca o rosto** pelo de uma modelo da marca. |
 | Modelo (pessoa) nas imagens | **Modelos salvas da marca**: ela cadastra uma ou mais modelos (foto de referência) e escolhe qual usar em cada lote. |
 | Fundo | **Escolhido por lote** a partir de uma lista pronta, com um **fundo padrão** configurável. |
-| Onde roda | **Servidor Docker** (decidido em 15/11/2026, substitui "no PC"). Acesso pelo navegador do PC ou do celular. Senha opcional (`APP_PASSWORD`). |
+| Onde roda | **CasaOS** (container). Imagem montada pelo GitHub Actions e publicada no GHCR; o CasaOS importa `casaos/estudio-ia.yml`. Senha opcional (`APP_PASSWORD`). |
+| Pastas de trabalho | `/DATA/AppData/estudio-ia/arquivos` com **Para editar** (entrada) e **Editadas** (saída, mesma estrutura). Toda pasta com fotos = 1 produto, em qualquer nível; nome da pasta = "o que está à venda"; `prompt.txt` opcional. Gerar de novo **adiciona** sem apagar. |
+| Opções no lote de pastas | Padrão do lote + ajuste por produto (poses, fundo, modelo, instruções). |
 | Provedor inicial | **OpenAI GPT Image** (versão mais recente: 2.6). Arquitetura preparada para outros provedores. |
 | Idioma | Interface toda em **português**. |
 
@@ -310,10 +312,23 @@ Soft diffused studio lighting, sharp focus, natural colors, vertical composition
 ### Fase 4 — Uso no dia a dia
 - [x] Acesso pelo celular (servidor Docker; telas responsivas)
 - [x] Histórico de lotes
-- [ ] Estimativa de custo e limite de gasto (o uso de tokens já é salvo por imagem)
+- [x] Estimativa de custo antes de gerar, custo por lote e total do mês
+- [ ] Limite de gasto mensal (bloquear/avisar)
 - [x] Senha de acesso opcional (`APP_PASSWORD`)
-- [ ] Testar o build da imagem Docker no servidor
-- [ ] Limpeza automática de fotos enviadas que não entraram em nenhum lote
+- [ ] Limpeza automática de fotos enviadas que não entraram em nenhum lote e da lixeira
+
+### Fase 6 — Pastas, CasaOS e produtividade ✅ (16/11/2026)
+- [x] Pasta de arquivos com "Para editar" e "Editadas" (mesma estrutura)
+- [x] Varredura a cada minuto + "Verificar agora"; espera a foto terminar de copiar
+- [x] "Novas imagens detectadas" no menu (contador) e na tela Gerar
+- [x] Tela Pastas: selecionar produtos, ajuste por produto, ignorar, mostrar processados
+- [x] Nome da pasta = produto; `prompt.txt` opcional por produto
+- [x] Saída `Pose.jpg`, `Pose 2.jpg`… sem nunca sobrescrever
+- [x] Aprovar / reprovar (lixeira interna, restaurar) / refazer
+- [x] Novo produto pelo celular (cria a pasta, opcionalmente já gera)
+- [x] Modo automático
+- [x] GitHub Actions publicando a imagem (amd64 + arm64) e YAML do CasaOS
+- [ ] Primeira instalação real no CasaOS e tornar o pacote do GHCR público
 
 ### Fase 5 — Outros provedores
 - [ ] FASHN
@@ -338,6 +353,14 @@ Soft diffused studio lighting, sharp focus, natural colors, vertical composition
 | 15/11/2026 | Troca de cabelo implementada como opção por modelo da marca (padrão: ligado) |
 | 15/11/2026 | Modo **simulação** incluído para testar sem gastar |
 | 15/11/2026 | Fases 1 e 2 e maior parte da 3 entregues; prévia de agrupamento mostra as peças antes de gerar |
+| 15/11/2026 | **Corte de cabeça/pés corrigido:** a API devolvia 2:3 e o sistema recortava para 3:4. Agora a imagem nunca é cortada; a sobra lateral é preenchida com o próprio fundo desfocado. O tamanho pedido e o recebido ficam salvos em cada imagem. |
+| 15/11/2026 | **System prompt editável** (Configurações › Diretrizes da loja), enviado em toda geração antes do prompt automático |
+| 15/11/2026 | **Campo "o que está à venda" por peça:** só o produto fica idêntico; o resto do look (outras roupas, chinelo, acessórios) a IA troca por peças que combinem |
+| 16/11/2026 | Implantação no **CasaOS** com imagem pronta do GitHub (GHCR), não compilando no servidor |
+| 16/11/2026 | Pastas "Para editar"/"Editadas"; toda pasta com fotos = produto; nome da pasta = produto; saída só adiciona |
+| 16/11/2026 | Opções padrão do lote + ajuste por produto; `prompt.txt` opcional por produto |
+| 16/11/2026 | Entraram: novo produto pelo celular, modo automático, aprovar/reprovar, estimativa de custo |
+| 16/11/2026 | Container roda como root por padrão (CasaOS cria pastas como root); `PUID`/`PGID` opcionais |
 
 ---
 

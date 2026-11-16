@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EstimativaCusto } from "@/components/Opcoes";
 import { FUNDOS, LIMITES, POSES } from "@/lib/catalog";
 import { api, enviarJson, mensagemErro } from "@/lib/client";
 import { agrupar, type ModoAgrupamento } from "@/lib/grouping";
@@ -25,6 +26,7 @@ const SIMULTANEOS = 3;
 export default function GerarPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
+  const [pendentesPastas, setPendentesPastas] = useState(0);
   const [modelos, setModelos] = useState<BrandModelPublic[]>([]);
 
   const [fotos, setFotos] = useState<Foto[]>([]);
@@ -35,6 +37,8 @@ export default function GerarPage() {
   const [modeloId, setModeloId] = useState("");
   const [variacoes, setVariacoes] = useState(1);
   const [descricao, setDescricao] = useState("");
+  /** O que está à venda em cada peça (chave = código da peça). */
+  const [produtos, setProdutos] = useState<Record<string, string>>({});
   const [arrastando, setArrastando] = useState(false);
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState("");
@@ -54,6 +58,9 @@ export default function GerarPage() {
         setModeloId(m.find((x) => x.isDefault)?.id ?? "");
       })
       .catch((e) => setErro(mensagemErro(e)));
+    api<{ pendentes: number }>("/api/pastas/resumo")
+      .then((r) => setPendentesPastas(r.pendentes))
+      .catch(() => {});
   }, []);
 
   function atualizarFoto(key: string, patch: Partial<Foto>) {
@@ -122,7 +129,11 @@ export default function GerarPage() {
     setCriando(true);
     try {
       const body = {
-        groups: grupos.map((g) => ({ code: g.code, uploadIds: g.indices.map((i) => validas[i].uploadId!) })),
+        groups: grupos.map((g) => ({
+          code: g.code,
+          uploadIds: g.indices.map((i) => validas[i].uploadId!),
+          product: produtos[g.code] ?? "",
+        })),
         poses,
         backgroundId: fundo,
         brandModelId: modeloId || null,
@@ -147,6 +158,19 @@ export default function GerarPage() {
         <h1 className="titulo">Gerar fotos para o site</h1>
         <p className="ajuda mt-1">Envie as fotos, confira as opções e clique em Gerar. A descrição é opcional.</p>
       </div>
+
+      {pendentesPastas > 0 && (
+        <Link
+          href="/pastas"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 transition hover:bg-rose-100"
+        >
+          <span>
+            <strong>Novas imagens detectadas nas pastas:</strong> {pendentesPastas}{" "}
+            {pendentesPastas === 1 ? "produto esperando" : "produtos esperando"}.
+          </span>
+          <span className="font-semibold">Ver e gerar →</span>
+        </Link>
+      )}
 
       {semChave && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -299,13 +323,27 @@ export default function GerarPage() {
           )}
 
           <div>
-            <p className="mb-2 text-sm text-stone-600">
-              {grupos.length} {grupos.length === 1 ? "peça encontrada" : "peças encontradas"}:
+            <p className="mb-1 text-sm text-stone-600">
+              {grupos.length} {grupos.length === 1 ? "peça encontrada" : "peças encontradas"}. Diga o que está à venda em
+              cada uma (opcional, mas recomendado):
             </p>
-            <ul className="flex flex-wrap gap-2">
+            <p className="ajuda mb-3">
+              Só o produto fica idêntico; o resto do look (outras roupas, chinelo, acessórios) a IA troca por peças que
+              combinem.
+            </p>
+            <ul className="space-y-2">
               {grupos.map((g) => (
-                <li key={g.code} className="chip bg-stone-100 text-stone-700">
-                  {g.code} · {g.indices.length} {g.indices.length === 1 ? "foto" : "fotos"}
+                <li key={g.code} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
+                  <span className="chip shrink-0 bg-stone-100 text-stone-700">
+                    {g.code} · {g.indices.length} {g.indices.length === 1 ? "foto" : "fotos"}
+                  </span>
+                  <input
+                    className="campo"
+                    aria-label={`O que está à venda na peça ${g.code}`}
+                    placeholder="O que está à venda? Ex.: camiseta listrada verde"
+                    value={produtos[g.code] ?? ""}
+                    onChange={(e) => setProdutos((prev) => ({ ...prev, [g.code]: e.target.value }))}
+                  />
                 </li>
               ))}
             </ul>
@@ -419,6 +457,7 @@ export default function GerarPage() {
       {/* Ação */}
       <div className="sticky bottom-0 -mx-4 border-t border-stone-200 bg-white/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:rounded-2xl sm:border">
         <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-0.5">
           <p className="text-sm text-stone-600">
             {validas.length === 0 ? (
               "Envie pelo menos uma foto."
@@ -431,6 +470,8 @@ export default function GerarPage() {
               </>
             )}
           </p>
+          <EstimativaCusto imagens={validas.length ? totalImagens : 0} />
+          </div>
           <button
             className="btn-primario px-6"
             onClick={gerar}

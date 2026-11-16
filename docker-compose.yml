@@ -1,20 +1,21 @@
+# Docker Compose genérico (fora do CasaOS). Para o CasaOS use casaos/estudio-ia.yml.
 services:
   estudio-ia:
+    # Imagem pronta do GitHub. Para compilar localmente: docker compose up -d --build
+    image: ghcr.io/diegoukan/roupas_ia_project:latest
     build: .
-    image: estudio-ia:latest
     container_name: estudio-ia
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      # Senha para abrir o sistema (recomendado se o servidor for acessível pela internet).
-      # Deixe vazio para não pedir senha (uso só na rede de casa).
       - APP_PASSWORD=${APP_PASSWORD:-}
-      # Opcional: a chave também pode ser colocada pela tela de Configurações.
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - TZ=America/Sao_Paulo
     volumes:
-      # Banco, fotos enviadas, modelos e imagens geradas ficam aqui (não se perdem ao atualizar).
       - estudio-dados:/app/data
+      # Pastas de trabalho ("Para editar" e "Editadas") ficam visíveis aqui ao lado.
+      - ./arquivos:/app/arquivos
 
 volumes:
   estudio-dados:

@@ -18,6 +18,23 @@ export function dataHora(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+/** "US$ 0,12 (≈ R$ 0,66)" */
+export function formatarCusto(usd: number | null | undefined, cotacao: number): string {
+  if (usd == null) return "—";
+  const us = usd.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: usd < 1 ? 3 : 2 });
+  const rs = (usd * cotacao).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return `US$ ${us} (≈ ${rs})`;
+}
+
+export type ResumoCustos = {
+  cotacao: number;
+  porImagemUSD: number | null;
+  base: "fixo" | "historico" | null;
+  estimativaUSD: number | null;
+  mesUSD: number;
+  imagensNoMes: number;
+};
+
 export function mensagemErro(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }

@@ -1,0 +1,55 @@
+# Monta a imagem Docker a cada push na main e publica no GitHub Container Registry:
+#   ghcr.io/diegoukan/roupas_ia_project:latest
+# O CasaOS só baixa essa imagem pronta (não compila nada no servidor).
+name: Imagem Docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: imagem-docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  imagem:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=ref,event=tag
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # amd64 = mini PC / PC comum; arm64 = Raspberry Pi e similares.
+          # Se o seu servidor for só um deles, pode tirar o outro para o build ficar mais rápido.
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

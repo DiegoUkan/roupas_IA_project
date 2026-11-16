@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { DEFAULT_FUNDO, DEFAULT_POSES, FUNDOS, LIMITES, POSES, PROPORCOES, QUALIDADES } from "./catalog";
+import { DEFAULT_FUNDO, DEFAULT_POSES, FUNDOS, LIMITES, POSES, PROPORCOES, QUALIDADES, SYSTEM_PROMPT_PADRAO } from "./catalog";
 
 export type ProviderId = "openai" | "simulacao";
 
@@ -14,6 +14,17 @@ export type Settings = {
   defaultBackground: string;
   variations: number;
   concurrency: number;
+  /** Diretrizes enviadas em toda geração, junto com o prompt automático. */
+  systemPrompt: string;
+  /** Produto novo detectado nas pastas entra sozinho na fila, com os padrões. */
+  autoMode: boolean;
+  /** Preços para estimar custo (US$ por 1 milhão de tokens). */
+  precoEntradaMilhao: number;
+  precoSaidaMilhao: number;
+  /** Se > 0, usa este valor fixo por imagem em vez dos tokens. */
+  custoFixoUSD: number;
+  /** Cotação usada para mostrar o custo em reais. */
+  cotacaoDolar: number;
 };
 
 /** O que o navegador recebe: nunca a chave inteira. */
@@ -34,6 +45,12 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultBackground: DEFAULT_FUNDO,
   variations: 1,
   concurrency: 2,
+  systemPrompt: SYSTEM_PROMPT_PADRAO,
+  autoMode: false,
+  precoEntradaMilhao: 8,
+  precoSaidaMilhao: 30,
+  custoFixoUSD: 0,
+  cotacaoDolar: 5.5,
 };
 
 const KEY = "app";
@@ -112,6 +129,19 @@ export function saveSettings(input: Partial<Settings> & { clearApiKey?: boolean 
 
   if (input.variations !== undefined) next.variations = clampInt(input.variations, 1, LIMITES.variacoesMax, next.variations);
   if (input.concurrency !== undefined) next.concurrency = clampInt(input.concurrency, 1, LIMITES.simultaneasMax, next.concurrency);
+  if (typeof input.autoMode === "boolean") next.autoMode = input.autoMode;
+  const numero = (v: unknown, min: number, max: number, atual: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : atual;
+  };
+  if (input.precoEntradaMilhao !== undefined) next.precoEntradaMilhao = numero(input.precoEntradaMilhao, 0, 1000, next.precoEntradaMilhao);
+  if (input.precoSaidaMilhao !== undefined) next.precoSaidaMilhao = numero(input.precoSaidaMilhao, 0, 1000, next.precoSaidaMilhao);
+  if (input.custoFixoUSD !== undefined) next.custoFixoUSD = numero(input.custoFixoUSD, 0, 100, next.custoFixoUSD);
+  if (input.cotacaoDolar !== undefined) next.cotacaoDolar = numero(input.cotacaoDolar, 0.01, 100, next.cotacaoDolar);
+  if (typeof input.systemPrompt === "string") {
+    if (input.systemPrompt.length > 6000) throw new Error("O system prompt passou de 6000 caracteres.");
+    next.systemPrompt = input.systemPrompt.trim();
+  }
 
   db()
     .prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")

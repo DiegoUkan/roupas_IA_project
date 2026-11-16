@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FUNDOS, LIMITES, MODELOS_SUGERIDOS, POSES, PROPORCOES, QUALIDADES } from "@/lib/catalog";
-import { api, enviarJson, mensagemErro } from "@/lib/client";
+import { FUNDOS, LIMITES, MODELOS_SUGERIDOS, POSES, PROPORCOES, QUALIDADES, SYSTEM_PROMPT_PADRAO } from "@/lib/catalog";
+import { api, enviarJson, formatarCusto, mensagemErro, type ResumoCustos } from "@/lib/client";
 import type { PublicSettings } from "@/lib/settings";
 
 type Form = Omit<PublicSettings, "hasApiKey" | "apiKeyMasked" | "apiKeyFromEnv"> & { apiKey: string };
@@ -13,6 +13,17 @@ export default function ConfiguracoesPage() {
   const [salvando, setSalvando] = useState(false);
   const [testando, setTestando] = useState(false);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [pastas, setPastas] = useState<{ pastaArquivos: string; pastaEntrada: string; pastaSaida: string } | null>(null);
+  const [custos, setCustos] = useState<ResumoCustos | null>(null);
+
+  useEffect(() => {
+    api<{ pastaArquivos: string; pastaEntrada: string; pastaSaida: string }>("/api/pastas/resumo")
+      .then(setPastas)
+      .catch(() => {});
+    api<ResumoCustos>("/api/custos")
+      .then(setCustos)
+      .catch(() => {});
+  }, []);
 
   function aplicar(s: PublicSettings) {
     setAtual(s);
@@ -155,6 +166,135 @@ export default function ConfiguracoesPage() {
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="card space-y-4">
+        <h2 className="subtitulo">Pastas e automação</h2>
+        {pastas && (
+          <div className="space-y-1 text-sm text-stone-600">
+            <p>
+              Pasta de arquivos no servidor: <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs">{pastas.pastaArquivos}</code>
+            </p>
+            <p>
+              Entrada: <strong>{pastas.pastaEntrada}</strong> · Saída: <strong>{pastas.pastaSaida}</strong> (mesma estrutura de
+              pastas). No CasaOS, essa pasta é a que você mapeou no YAML (ex.: /DATA/AppData/estudio-ia/arquivos).
+            </p>
+          </div>
+        )}
+        <label className="flex items-start gap-3 rounded-xl border border-stone-200 p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-5 w-5 accent-rose-600"
+            checked={form.autoMode}
+            onChange={(e) => campo("autoMode", e.target.checked)}
+          />
+          <span>
+            <span className="block text-sm font-semibold text-stone-900">Modo automático</span>
+            <span className="block text-sm text-stone-500">
+              Produto novo (ou com fotos novas) nas pastas entra sozinho na fila, com as poses, o fundo e a modelo padrão. Sem
+              precisar clicar em nada. As fotos precisam ficar 20 segundos sem mudar antes de entrar.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      <section className="card space-y-4">
+        <h2 className="subtitulo">Custos</h2>
+        {custos && (
+          <p className="text-sm text-stone-600">
+            Gasto neste mês: <strong className="text-stone-900">{formatarCusto(custos.mesUSD, custos.cotacao)}</strong> em{" "}
+            {custos.imagensNoMes} {custos.imagensNoMes === 1 ? "imagem" : "imagens"} com custo calculado.
+            {custos.porImagemUSD != null && <> Média por imagem: {formatarCusto(custos.porImagemUSD, custos.cotacao)}.</>}
+          </p>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="rotulo" htmlFor="precoEntrada">
+              US$ por 1M tokens de entrada
+            </label>
+            <input
+              id="precoEntrada"
+              type="number"
+              step="0.01"
+              min="0"
+              className="campo"
+              value={form.precoEntradaMilhao}
+              onChange={(e) => campo("precoEntradaMilhao", Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <label className="rotulo" htmlFor="precoSaida">
+              US$ por 1M tokens de saída
+            </label>
+            <input
+              id="precoSaida"
+              type="number"
+              step="0.01"
+              min="0"
+              className="campo"
+              value={form.precoSaidaMilhao}
+              onChange={(e) => campo("precoSaidaMilhao", Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <label className="rotulo" htmlFor="custoFixo">
+              Ou valor fixo por imagem (US$)
+            </label>
+            <input
+              id="custoFixo"
+              type="number"
+              step="0.001"
+              min="0"
+              className="campo"
+              value={form.custoFixoUSD}
+              onChange={(e) => campo("custoFixoUSD", Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <label className="rotulo" htmlFor="cotacao">
+              Cotação do dólar (R$)
+            </label>
+            <input
+              id="cotacao"
+              type="number"
+              step="0.01"
+              min="0"
+              className="campo"
+              value={form.cotacaoDolar}
+              onChange={(e) => campo("cotacaoDolar", Number(e.target.value))}
+            />
+          </div>
+        </div>
+        <p className="ajuda">
+          O custo é calculado pelos tokens que a API informa em cada imagem (padrão: preços do GPT Image 2.5/2.6). Se a sua API
+          não informa tokens ou cobra por imagem, preencha o valor fixo (0 = usar os tokens).
+        </p>
+      </section>
+
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="subtitulo">Diretrizes da loja (system prompt)</h2>
+          <button
+            type="button"
+            className="text-sm font-medium text-rose-700 hover:underline"
+            onClick={() => {
+              if (!form.systemPrompt || confirm("Substituir o texto atual pelo padrão?")) campo("systemPrompt", SYSTEM_PROMPT_PADRAO);
+            }}
+          >
+            Restaurar padrão
+          </button>
+        </div>
+        <p className="ajuda">
+          Este texto vai junto em <strong>toda</strong> geração, antes do prompt automático (pose, fundo, produto) e da
+          descrição do lote. Use para regras fixas: enquadramento, o que trocar no look, tipo de calçado, estilo das fotos.
+        </p>
+        <textarea
+          className="campo min-h-72 font-mono text-[13px] leading-relaxed"
+          value={form.systemPrompt}
+          onChange={(e) => campo("systemPrompt", e.target.value)}
+          maxLength={6000}
+        />
+        <p className="ajuda text-right">{form.systemPrompt.length}/6000</p>
       </section>
 
       <section className="card space-y-4">

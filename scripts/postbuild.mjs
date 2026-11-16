@@ -11,5 +11,7 @@ if (fs.existsSync(standalone)) {
   if (fs.existsSync(path.join(raiz, "public"))) {
     fs.cpSync(path.join(raiz, "public"), path.join(standalone, "public"), { recursive: true });
   }
+  // O rastreamento do build às vezes copia os dados locais; eles nunca devem ir junto.
+  for (const pasta of ["data", "arquivos"]) fs.rmSync(path.join(standalone, pasta), { recursive: true, force: true });
   console.log("Arquivos estáticos copiados para .next/standalone");
 }

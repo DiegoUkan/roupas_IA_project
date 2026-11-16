@@ -12,14 +12,19 @@ export async function salvarUpload(file: File): Promise<UploadInfo> {
   if (file.size > LIMITES.tamanhoArquivoMaxMB * 1024 * 1024) {
     throw new Error(`A foto "${file.name}" passa de ${LIMITES.tamanhoArquivoMaxMB} MB.`);
   }
-  const { data, width, height } = await normalizarUpload(Buffer.from(await file.arrayBuffer()));
+  return salvarUploadBuffer(Buffer.from(await file.arrayBuffer()), file.name);
+}
+
+/** Igual a salvarUpload, mas a partir de bytes (ex.: fotos lidas das pastas). */
+export async function salvarUploadBuffer(buf: Buffer, nome: string): Promise<UploadInfo> {
+  const { data, width, height } = await normalizarUpload(buf);
   const id = newId();
   const rel = toRel("uploads", `${id}.jpg`);
   writeDataFile(rel, data);
   db()
     .prepare("INSERT INTO uploads (id, file, name, width, height, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(id, rel, file.name.slice(0, 200), width, height, nowIso());
-  return { id, name: file.name, url: fileUrl(rel), width, height };
+    .run(id, rel, nome.slice(0, 200), width, height, nowIso());
+  return { id, name: nome, url: fileUrl(rel), width, height };
 }
 
 export function getUploads(ids: string[]): Map<string, UploadRow> {

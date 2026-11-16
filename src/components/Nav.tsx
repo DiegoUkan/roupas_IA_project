@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const LINKS = [
   { href: "/", nome: "Gerar" },
+  { href: "/pastas", nome: "Pastas" },
+  { href: "/novo-produto", nome: "Novo produto" },
   { href: "/lotes", nome: "Lotes" },
   { href: "/modelos", nome: "Modelos" },
   { href: "/configuracoes", nome: "Configurações" },
@@ -12,6 +15,18 @@ const LINKS = [
 
 export default function Nav({ senhaAtiva }: { senhaAtiva: boolean }) {
   const pathname = usePathname();
+  const [pendentes, setPendentes] = useState(0);
+
+  useEffect(() => {
+    const carregar = () =>
+      fetch("/api/pastas/resumo")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((r) => r && setPendentes(r.pendentes ?? 0))
+        .catch(() => {});
+    carregar();
+    const t = setInterval(carregar, 30000);
+    return () => clearInterval(t);
+  }, [pathname]);
 
   async function sair() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -32,11 +47,16 @@ export default function Nav({ senhaAtiva }: { senhaAtiva: boolean }) {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
                   ativo ? "bg-rose-50 text-rose-700" : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
                 }`}
               >
                 {l.nome}
+                {l.href === "/pastas" && pendentes > 0 && (
+                  <span className="grid min-w-5 place-items-center rounded-full bg-rose-600 px-1.5 text-[11px] font-bold leading-5 text-white">
+                    {pendentes}
+                  </span>
+                )}
               </Link>
             );
           })}

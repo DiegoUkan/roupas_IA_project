@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { detalharLote } from "@/lib/batches";
-import { api, dataHora, mensagemErro } from "@/lib/client";
+import { api, dataHora, enviarJson, mensagemErro } from "@/lib/client";
 
 type Lote = NonNullable<ReturnType<typeof detalharLote>>;
 type Imagem = Lote["pecas"][number]["imagens"][number];
@@ -50,6 +50,15 @@ export default function LotePage() {
     }
   }
 
+  async function revisar(img: Imagem, revisao: "aprovada" | "reprovada" | null) {
+    try {
+      await api(`/api/jobs/${img.id}/review`, enviarJson("POST", { revisao }));
+      await carregar();
+    } catch (e) {
+      alert(mensagemErro(e));
+    }
+  }
+
   async function refazerErros() {
     if (!lote) return;
     const comErro = lote.pecas.flatMap((p) => p.imagens).filter((i) => i.status === "erro");
@@ -81,6 +90,7 @@ export default function LotePage() {
             Fundo: {lote.fundo} · Modelo: {lote.modelo ?? "pessoa da foto"} · Proporção {lote.proporcao} · Qualidade {lote.qualidade}
           </p>
           {lote.descricao && <p className="ajuda mt-1">Descrição: “{lote.descricao}”</p>}
+          {lote.custoUSD > 0 && <p className="ajuda mt-1">Custo deste lote: US$ {lote.custoUSD.toFixed(3).replace(".", ",")}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {c.pronto > 0 && (
@@ -120,6 +130,7 @@ export default function LotePage() {
         <section key={peca.id} className="card space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="subtitulo">{peca.code}</h2>
+            {peca.produto && <span className="chip bg-rose-50 text-rose-700">Produto: {peca.produto}</span>}
             <div className="flex gap-1.5">
               {peca.originais.map((url) => (
                 <a key={url} href={url} target="_blank" rel="noreferrer" title="Foto original">
@@ -130,18 +141,51 @@ export default function LotePage() {
             </div>
             <span className="ajuda">← originais</span>
           </div>
+          {(peca.pasta || peca.fundo || peca.modelo !== undefined || peca.instrucoes) && (
+            <div className="space-y-0.5 text-xs text-stone-500">
+              {peca.pasta && (
+                <p>
+                  Pasta: <strong className="text-stone-700">Para editar/{peca.pasta}</strong> → as aprovadas ficam em{" "}
+                  <strong className="text-stone-700">Editadas/{peca.pasta}</strong>
+                </p>
+              )}
+              {(peca.fundo || peca.modelo !== undefined) && (
+                <p>
+                  Opções próprias: {peca.fundo ? `fundo ${peca.fundo}` : ""}
+                  {peca.fundo && peca.modelo !== undefined ? " · " : ""}
+                  {peca.modelo !== undefined ? `modelo ${peca.modelo ?? "pessoa da foto"}` : ""}
+                </p>
+              )}
+              {peca.instrucoes && <p className="line-clamp-2">Instruções: “{peca.instrucoes}”</p>}
+            </div>
+          )}
 
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {peca.imagens.map((img) => (
               <li key={img.id} className="space-y-1.5">
                 <div
-                  className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100"
+                  className={`relative overflow-hidden rounded-xl border bg-stone-100 ${
+                    img.revisao === "aprovada"
+                      ? "border-emerald-400 ring-2 ring-emerald-200"
+                      : img.revisao === "reprovada"
+                        ? "border-stone-200 opacity-40 grayscale"
+                        : "border-stone-200"
+                  }`}
                   style={{ aspectRatio: proporcaoCss(lote.proporcao) }}
                 >
                   {img.status === "pronto" && img.url ? (
                     <a href={img.url} target="_blank" rel="noreferrer">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img.url} alt={`${peca.code} ${img.pose}`} className="h-full w-full object-cover" />
+                      {img.revisao && (
+                        <span
+                          className={`chip absolute left-2 top-2 ${
+                            img.revisao === "aprovada" ? "bg-emerald-600 text-white" : "bg-stone-800 text-white"
+                          }`}
+                        >
+                          {img.revisao === "aprovada" ? "Aprovada" : "Reprovada"}
+                        </span>
+                      )}
                     </a>
                   ) : img.status === "erro" ? (
                     <div className="flex h-full flex-col items-center justify-center gap-2 bg-red-50 p-3 text-center">
@@ -183,6 +227,37 @@ export default function LotePage() {
                     )}
                   </span>
                 </div>
+                {img.status === "pronto" && (
+                  <div className="flex gap-1.5">
+                    {img.revisao === "reprovada" ? (
+                      <button
+                        onClick={() => revisar(img, null)}
+                        className="flex-1 rounded-lg border border-stone-300 px-2 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                      >
+                        Restaurar
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => revisar(img, img.revisao === "aprovada" ? null : "aprovada")}
+                          className={`flex-1 rounded-lg border px-2 py-1 text-xs font-medium ${
+                            img.revisao === "aprovada"
+                              ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                              : "border-stone-300 text-stone-700 hover:bg-emerald-50"
+                          }`}
+                        >
+                          ✓ Aprovar
+                        </button>
+                        <button
+                          onClick={() => revisar(img, "reprovada")}
+                          className="flex-1 rounded-lg border border-stone-300 px-2 py-1 text-xs font-medium text-stone-700 hover:bg-red-50"
+                        >
+                          ✕ Reprovar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

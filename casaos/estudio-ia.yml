@@ -1,0 +1,65 @@
+# YAML para importar no CasaOS (App Store › "+" › Instalar um app personalizado › Importar).
+# A imagem é montada pelo GitHub (Actions) a cada push na main.
+name: estudio-ia
+services:
+  estudio-ia:
+    image: ghcr.io/diegoukan/roupas_ia_project:latest
+    container_name: estudio-ia
+    restart: unless-stopped
+    ports:
+      # "porta-no-servidor:3000" — troque o primeiro número se a 3000 já estiver em uso no CasaOS.
+      - "3000:3000"
+    environment:
+      # Senha para entrar no sistema. TROQUE antes de instalar (vazio = sem senha).
+      APP_PASSWORD: "troque-esta-senha"
+      TZ: America/Sao_Paulo
+      # Opcional: rodar com outro usuário em vez de root (ex.: 1000).
+      # PUID: "1000"
+      # PGID: "1000"
+    volumes:
+      # Banco, configurações, modelos da marca e cópias internas.
+      - /DATA/AppData/estudio-ia/sistema:/app/data
+      # Pastas de trabalho: "Para editar" (entrada) e "Editadas" (saída, mesma estrutura).
+      - /DATA/AppData/estudio-ia/arquivos:/app/arquivos
+    x-casaos:
+      envs:
+        - container: APP_PASSWORD
+          description:
+            en_us: Password to open the app (empty = no password)
+            pt_br: Senha para abrir o sistema (vazio = sem senha)
+      ports:
+        - container: "3000"
+          description:
+            en_us: Web UI
+            pt_br: Interface web
+      volumes:
+        - container: /app/data
+          description:
+            en_us: Database, settings and brand models
+            pt_br: Banco, configurações e modelos da marca
+        - container: /app/arquivos
+          description:
+            en_us: Work folders ("Para editar" input and "Editadas" output)
+            pt_br: Pastas de trabalho ("Para editar" e "Editadas")
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: estudio-ia
+  author: DiegoUkan
+  developer: DiegoUkan
+  category: Utilities
+  icon: https://raw.githubusercontent.com/DiegoUkan/roupas_IA_project/main/public/icone.png
+  title:
+    en_us: Estúdio IA
+    pt_br: Estúdio IA
+  tagline:
+    en_us: AI product photos for the clothing store
+    pt_br: Fotos de produto com IA para a loja de roupas
+  description:
+    en_us: Turns everyday clothing photos into catalog images using AI, with folder watching and batch generation.
+    pt_br: Transforma as fotos das roupas em imagens de catálogo com IA, lendo as pastas e gerando em lote.
+  port_map: "3000"
+  scheme: http
+  index: /

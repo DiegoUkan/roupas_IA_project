@@ -26,6 +26,22 @@ export const POSES: Pose[] = [
 
 export const DEFAULT_POSES = ["frente", "costas", "tres-quartos", "caminhando"];
 
+/** Nome do arquivo gerado na pasta Editadas para cada pose (ex.: "Frente.jpg", "Frente 2.jpg"). */
+export const NOME_ARQUIVO_POSE: Record<string, string> = {
+  frente: "Frente",
+  costas: "Costas",
+  perfil: "Perfil",
+  "tres-quartos": "Três-quartos",
+  "mao-cintura": "Mão na cintura",
+  caminhando: "Caminhando",
+  sentada: "Sentada",
+  ombro: "Olhando por cima do ombro",
+  "meio-corpo": "Meio corpo",
+  relaxada: "Mãos no bolso",
+  girando: "Girando",
+  parede: "Encostada na parede",
+};
+
 export type Fundo = { id: string; nome: string; prompt: string };
 
 export const FUNDOS: Fundo[] = [
@@ -80,6 +96,15 @@ export function fundoById(id: string) {
 export function proporcaoById(id: string) {
   return PROPORCOES.find((p) => p.id === id) ?? PROPORCOES[0];
 }
+
+/** Diretrizes enviadas em TODA geração (editáveis em Configurações). */
+export const SYSTEM_PROMPT_PADRAO = `Você é um fotógrafo e stylist de catálogo de uma loja de roupas online. Siga sempre estas regras:
+
+1. ENQUADRAMENTO: em poses de corpo inteiro, a pessoa aparece INTEIRA. A cabeça com todo o cabelo e os pés com os calçados devem aparecer por completo, nunca cortados pela borda. Deixe um espaço de fundo livre acima da cabeça e abaixo dos pés (cerca de 5% da altura da imagem em cada lado).
+2. PRODUTO: a peça que está à venda deve ser reproduzida exatamente igual à foto: cor, tecido, textura, estampa, modelagem, comprimento, botões, costuras e todos os detalhes.
+3. RESTO DO LOOK: tudo o que a pessoa veste e não é o produto (outras roupas, calçados, bolsas, acessórios) pode e deve ser trocado por peças que combinem com o produto e deixem a foto mais bonita e na moda. Não copie essas peças da foto original só porque estavam lá.
+4. CALÇADOS: nunca use chinelo, pantufa, meia ou calçado caseiro, a não ser que ele seja o produto. Coloque um calçado bonito e adequado ao look (sandália elegante, salto, mule, tênis limpo, bota…).
+5. ESTILO: foto profissional de catálogo, luz suave, cores fiéis, pele natural, aparência realista. Sem texto, marca d'água ou logotipos.`;
 
 export const LIMITES = {
   variacoesMax: 4,
